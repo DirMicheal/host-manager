@@ -63,8 +63,8 @@ public class AppSettings : BindableBase
 
     public string Language
     {
-        get => _language;
-        set => SetProperty(ref _language, value);
+        get => _language ?? string.Empty;
+        set => SetProperty(ref _language, value ?? string.Empty);
     }
 
     public bool ShowTutorialOnStartup

@@ -19,8 +19,8 @@ public class BackupSnapshot : BindableBase
 
     public string Name
     {
-        get => _name;
-        set => SetProperty(ref _name, value);
+        get => _name ?? string.Empty;
+        set => SetProperty(ref _name, value ?? string.Empty);
     }
 
     public DateTime Timestamp
@@ -31,14 +31,14 @@ public class BackupSnapshot : BindableBase
 
     public string ContentHash
     {
-        get => _contentHash;
-        set => SetProperty(ref _contentHash, value);
+        get => _contentHash ?? string.Empty;
+        set => SetProperty(ref _contentHash, value ?? string.Empty);
     }
 
     public string FilePath
     {
-        get => _filePath;
-        set => SetProperty(ref _filePath, value);
+        get => _filePath ?? string.Empty;
+        set => SetProperty(ref _filePath, value ?? string.Empty);
     }
 
     public long Size
@@ -55,8 +55,8 @@ public class BackupSnapshot : BindableBase
 
     public string Description
     {
-        get => _description;
-        set => SetProperty(ref _description, value);
+        get => _description ?? string.Empty;
+        set => SetProperty(ref _description, value ?? string.Empty);
     }
 
     public BackupSnapshot()

@@ -21,14 +21,14 @@ public class HostEnvironment : BindableBase
 
     public string Name
     {
-        get => _name;
-        set => SetProperty(ref _name, value);
+        get => _name ?? string.Empty;
+        set => SetProperty(ref _name, value ?? string.Empty);
     }
 
     public string Description
     {
-        get => _description;
-        set => SetProperty(ref _description, value);
+        get => _description ?? string.Empty;
+        set => SetProperty(ref _description, value ?? string.Empty);
     }
 
     public bool IsActive
@@ -45,8 +45,8 @@ public class HostEnvironment : BindableBase
 
     public ObservableCollection<HostRule> Rules
     {
-        get => _rules;
-        set => SetProperty(ref _rules, value);
+        get => _rules ??= new ObservableCollection<HostRule>();
+        set => SetProperty(ref _rules, value ?? new ObservableCollection<HostRule>());
     }
 
     public DateTime CreatedAt

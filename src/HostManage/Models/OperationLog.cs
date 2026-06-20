@@ -31,32 +31,32 @@ public class OperationLog : BindableBase
 
     public string Action
     {
-        get => _action;
-        set => SetProperty(ref _action, value);
+        get => _action ?? string.Empty;
+        set => SetProperty(ref _action, value ?? string.Empty);
     }
 
     public string Message
     {
-        get => _message;
-        set => SetProperty(ref _message, value);
+        get => _message ?? string.Empty;
+        set => SetProperty(ref _message, value ?? string.Empty);
     }
 
     public string UserName
     {
-        get => _userName;
-        set => SetProperty(ref _userName, value);
+        get => _userName ?? string.Empty;
+        set => SetProperty(ref _userName, value ?? string.Empty);
     }
 
     public string MachineName
     {
-        get => _machineName;
-        set => SetProperty(ref _machineName, value);
+        get => _machineName ?? string.Empty;
+        set => SetProperty(ref _machineName, value ?? string.Empty);
     }
 
     public string Details
     {
-        get => _details;
-        set => SetProperty(ref _details, value);
+        get => _details ?? string.Empty;
+        set => SetProperty(ref _details, value ?? string.Empty);
     }
 
     public OperationLog()

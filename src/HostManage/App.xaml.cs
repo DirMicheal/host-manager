@@ -11,7 +11,7 @@ public partial class App : Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -30,8 +30,11 @@ public partial class App : Application
             var logService = Services.GetRequiredService<ILogService>();
             var themeService = Services.GetRequiredService<IThemeService>();
 
-            await settingsService.LoadSettingsAsync();
-            await environmentService.LoadEnvironmentsAsync();
+            Task.Run(async () =>
+            {
+                await settingsService.LoadSettingsAsync().ConfigureAwait(false);
+                await environmentService.LoadEnvironmentsAsync().ConfigureAwait(false);
+            }).GetAwaiter().GetResult();
 
             logService.LogAction("App_Startup", "应用程序启动");
 
@@ -42,8 +45,12 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"应用程序初始化失败:\n{ex.Message}\n\n{ex.InnerException?.Message}",
-                "启动错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            var msg = $"应用程序初始化失败:\n{ex.Message}\n\n堆栈跟踪:\n{ex.StackTrace}";
+            if (ex.InnerException != null)
+            {
+                msg += $"\n\n内部异常:\n{ex.InnerException.Message}\n\n{ex.InnerException.StackTrace}";
+            }
+            MessageBox.Show(msg, "启动错误", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }
@@ -57,8 +64,12 @@ public partial class App : Application
         }
         catch { }
 
-        MessageBox.Show($"发生未处理的异常:\n{e.Exception.Message}",
-            "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        var msg = $"发生未处理的异常:\n{e.Exception.Message}\n\n类型: {e.Exception.GetType().Name}\n\n堆栈跟踪:\n{e.Exception.StackTrace}";
+        if (e.Exception.InnerException != null)
+        {
+            msg += $"\n\n内部异常:\n{e.Exception.InnerException.Message}\n\n{e.Exception.InnerException.StackTrace}";
+        }
+        MessageBox.Show(msg, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }
 
@@ -72,6 +83,13 @@ public partial class App : Application
                 logService?.LogError("DomainUnhandledException", ex.Message, ex.ToString());
             }
             catch { }
+
+            var msg = $"发生未处理的域异常:\n{ex.Message}\n\n类型: {ex.GetType().Name}\n\n堆栈跟踪:\n{ex.StackTrace}";
+            if (ex.InnerException != null)
+            {
+                msg += $"\n\n内部异常:\n{ex.InnerException.Message}\n\n{ex.InnerException.StackTrace}";
+            }
+            MessageBox.Show(msg, "严重错误", MessageBoxButton.OK, MessageBoxImage.Stop);
         }
     }
 

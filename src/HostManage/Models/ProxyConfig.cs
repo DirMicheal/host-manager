@@ -20,8 +20,8 @@ public class ProxyConfig : BindableBase
 
     public string Name
     {
-        get => _name;
-        set => SetProperty(ref _name, value);
+        get => _name ?? string.Empty;
+        set => SetProperty(ref _name, value ?? string.Empty);
     }
 
     public ProxyType Type
@@ -32,8 +32,8 @@ public class ProxyConfig : BindableBase
 
     public string Host
     {
-        get => _host;
-        set => SetProperty(ref _host, value);
+        get => _host ?? string.Empty;
+        set => SetProperty(ref _host, value ?? string.Empty);
     }
 
     public int Port
@@ -44,14 +44,14 @@ public class ProxyConfig : BindableBase
 
     public string Username
     {
-        get => _username;
-        set => SetProperty(ref _username, value);
+        get => _username ?? string.Empty;
+        set => SetProperty(ref _username, value ?? string.Empty);
     }
 
     public string Password
     {
-        get => _password;
-        set => SetProperty(ref _password, value);
+        get => _password ?? string.Empty;
+        set => SetProperty(ref _password, value ?? string.Empty);
     }
 
     public bool IsSystemProxy
@@ -62,8 +62,8 @@ public class ProxyConfig : BindableBase
 
     public string EncryptedPassword
     {
-        get => _encryptedPassword;
-        set => SetProperty(ref _encryptedPassword, value);
+        get => _encryptedPassword ?? string.Empty;
+        set => SetProperty(ref _encryptedPassword, value ?? string.Empty);
     }
 
     public ProxyConfig()

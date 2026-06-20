@@ -588,6 +588,7 @@ public class MainViewModel : ViewModelBase
 
         try
         {
+            await Task.CompletedTask;
             var conflictGroups = _allRules
                 .Where(r => r.IsEnabled && !string.IsNullOrWhiteSpace(r.Domain))
                 .GroupBy(r => r.Domain.ToLower())
@@ -625,6 +626,7 @@ public class MainViewModel : ViewModelBase
 
         try
         {
+            await Task.CompletedTask;
             var invalidCount = 0;
             foreach (var rule in _allRules)
             {

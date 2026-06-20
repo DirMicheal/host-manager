@@ -21,20 +21,20 @@ public class HostRule : BindableBase
 
     public string IP
     {
-        get => _ip;
-        set => SetProperty(ref _ip, value);
+        get => _ip ?? string.Empty;
+        set => SetProperty(ref _ip, value ?? string.Empty);
     }
 
     public string Domain
     {
-        get => _domain;
-        set => SetProperty(ref _domain, value);
+        get => _domain ?? string.Empty;
+        set => SetProperty(ref _domain, value ?? string.Empty);
     }
 
     public string Comment
     {
-        get => _comment;
-        set => SetProperty(ref _comment, value);
+        get => _comment ?? string.Empty;
+        set => SetProperty(ref _comment, value ?? string.Empty);
     }
 
     public bool IsEnabled
