@@ -16,7 +16,7 @@
         <materialDesign:ColorZone Grid.Row="0" Mode="PrimaryMid" Padding="16,8">
             <StackPanel Orientation="Horizontal">
                 <Button Content="立即备份" Style="{StaticResource MaterialDesignRaisedButton}"
-                        Command="{Binding BackupNowCommand}" Margin="0,0,8,0" Background="#FF4CAF50">
+                        Command="{Binding CreateCommand}" Margin="0,0,8,0" Background="#FF4CAF50">
                     <Button.ContentTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
@@ -71,7 +71,7 @@
                     </Button.ContentTemplate>
                 </Button>
                 <Button Content="清理旧备份" Style="{StaticResource MaterialDesignRaisedButton}"
-                        Command="{Binding CleanupCommand}" Margin="0,0,8,0">
+                        Command="{Binding CleanCommand}" Margin="0,0,8,0">
                     <Button.ContentTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
@@ -86,22 +86,16 @@
 
         <DataGrid Grid.Row="1"
                   ItemsSource="{Binding Snapshots}"
+                  SelectedItem="{Binding SelectedSnapshot}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   SelectionMode="Extended"
                   materialDesign:DataGridAssist.CellPadding="8,4"
                   materialDesign:DataGridAssist.ColumnHeaderPadding="8,6">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="选择" Binding="{Binding IsSelected}" Width="60"/>
                 <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="220"/>
                 <DataGridTextColumn Header="创建时间" Binding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm:ss'}" Width="180"/>
-                <DataGridTemplateColumn Header="大小" Width="120">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Size, Converter={StaticResource BytesToSizeConverter}}" VerticalAlignment="Center"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="大小" Binding="{Binding Size}" Width="120"/>
                 <DataGridTemplateColumn Header="类型" Width="120">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -132,8 +126,8 @@
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="恢复" Style="{StaticResource MaterialDesignIconForegroundButton}"
-                                        Command="{Binding DataContext.RestoreItemCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                        CommandParameter="{Binding}" Margin="2,0" Padding="6,2" Background="#FF2196F3" Foreground="White">
+                                        Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        Margin="2,0" Padding="6,2" Background="#FF2196F3" Foreground="White">
                                     <Button.ContentTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">
@@ -144,8 +138,8 @@
                                     </Button.ContentTemplate>
                                 </Button>
                                 <Button Content="导出" Style="{StaticResource MaterialDesignIconForegroundButton}"
-                                        Command="{Binding DataContext.ExportItemCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                        CommandParameter="{Binding}" Margin="2,0" Padding="6,2">
+                                        Command="{Binding DataContext.ExportCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        Margin="2,0" Padding="6,2">
                                     <Button.ContentTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">
@@ -156,8 +150,8 @@
                                     </Button.ContentTemplate>
                                 </Button>
                                 <Button Content="删除" Style="{StaticResource MaterialDesignIconForegroundButton}"
-                                        Command="{Binding DataContext.DeleteItemCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                        CommandParameter="{Binding}" Margin="2,0" Padding="6,2" Foreground="#FFF44336">
+                                        Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        Margin="2,0" Padding="6,2" Foreground="#FFF44336">
                                     <Button.ContentTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal">

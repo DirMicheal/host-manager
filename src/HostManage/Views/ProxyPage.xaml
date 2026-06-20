@@ -16,7 +16,7 @@
         <materialDesign:ColorZone Grid.Row="0" Mode="PrimaryMid" Padding="16,8">
             <StackPanel Orientation="Horizontal">
                 <Button Content="新建代理" Style="{StaticResource MaterialDesignRaisedButton}"
-                        Command="{Binding CreateCommand}" Margin="0,0,8,0">
+                        Command="{Binding AddCommand}" Margin="0,0,8,0">
                     <Button.ContentTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
@@ -30,7 +30,7 @@
         </materialDesign:ColorZone>
 
         <DataGrid Grid.Row="1"
-                  ItemsSource="{Binding ProxyList}"
+                  ItemsSource="{Binding Proxies}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   SelectionMode="Single"
@@ -73,9 +73,7 @@
                 <DataGridTemplateColumn Header="系统代理" Width="100">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <CheckBox IsChecked="{Binding IsSystemProxy}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                      Command="{Binding DataContext.SetSystemProxyCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                      CommandParameter="{Binding}"/>
+                            <CheckBox IsChecked="{Binding IsSystemProxy}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -108,7 +106,7 @@
                                     </Button.ContentTemplate>
                                 </Button>
                                 <Button Content="应用到系统" Style="{StaticResource MaterialDesignIconForegroundButton}"
-                                        Command="{Binding DataContext.ApplyToSystemCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        Command="{Binding DataContext.ApplyCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                         CommandParameter="{Binding}" Margin="2,0" Padding="6,2" Background="#FF2196F3" Foreground="White">
                                     <Button.ContentTemplate>
                                         <DataTemplate>

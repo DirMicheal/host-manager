@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Windows;
+using System.Windows.Threading;
 using HostManage.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -14,11 +16,12 @@ public class LogService : ILogService, IDisposable
     private const int PersistIntervalMs = 10000;
 
     private readonly ILogger<LogService> _logger;
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly object _lock = new();
     private readonly string _logsFilePath;
     private readonly Queue<OperationLog> _pendingLogs = new();
-    private readonly Timer _persistTimer;
+    private Timer? _persistTimer;
     private bool _disposed;
+    private bool _loaded;
 
     public ObservableCollection<OperationLog> Logs { get; private set; } = new();
 
@@ -33,38 +36,41 @@ public class LogService : ILogService, IDisposable
         }
         _logsFilePath = Path.Combine(appDataPath, "logs.json");
 
-        _persistTimer = new Timer(PersistTimerCallback, null, PersistIntervalMs, PersistIntervalMs);
+        LoadLogsSync();
 
-        _ = LoadLogsAsync();
+        _persistTimer = new Timer(PersistTimerCallback, null, PersistIntervalMs, PersistIntervalMs);
     }
 
-    private async Task LoadLogsAsync()
+    private void LoadLogsSync()
     {
-        await _semaphore.WaitAsync();
-        try
+        lock (_lock)
         {
-            if (File.Exists(_logsFilePath))
+            try
             {
-                var json = await File.ReadAllTextAsync(_logsFilePath);
-                if (!string.IsNullOrWhiteSpace(json))
+                if (File.Exists(_logsFilePath))
                 {
-                    var list = JsonConvert.DeserializeObject<List<OperationLog>>(json);
-                    if (list != null && list.Count > 0)
+                    var json = File.ReadAllText(_logsFilePath);
+                    if (!string.IsNullOrWhiteSpace(json))
                     {
-                        list = list.OrderByDescending(x => x.Timestamp).Take(MaxLogsInMemory).ToList();
-                        Logs = new ObservableCollection<OperationLog>(list);
+                        var list = JsonConvert.DeserializeObject<List<OperationLog>>(json);
+                        if (list != null && list.Count > 0)
+                        {
+                            list = list.OrderByDescending(x => x.Timestamp).Take(MaxLogsInMemory).ToList();
+                            Logs = new ObservableCollection<OperationLog>(list);
+                        }
                     }
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "加载日志文件失败");
-            Logs = new ObservableCollection<OperationLog>();
-        }
-        finally
-        {
-            _semaphore.Release();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "加载日志文件失败");
+                Logs = new ObservableCollection<OperationLog>();
+            }
+            finally
+            {
+                _loaded = true;
+                Monitor.PulseAll(_lock);
+            }
         }
     }
 
@@ -102,58 +108,77 @@ public class LogService : ILogService, IDisposable
             Details = details ?? string.Empty
         };
 
-        _semaphore.Wait();
-        try
+        lock (_lock)
         {
-            Logs.Insert(0, log);
-            while (Logs.Count > MaxLogsInMemory)
+            while (!_loaded && !_disposed)
             {
-                Logs.RemoveAt(Logs.Count - 1);
+                Monitor.Wait(_lock, 50);
             }
+
+            if (_disposed) return;
+
+            void InsertLog()
+            {
+                Logs.Insert(0, log);
+                while (Logs.Count > MaxLogsInMemory)
+                {
+                    Logs.RemoveAt(Logs.Count - 1);
+                }
+            }
+
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.BeginInvoke(InsertLog, DispatcherPriority.Background);
+            }
+            else
+            {
+                InsertLog();
+            }
+
             _pendingLogs.Enqueue(log);
-        }
-        finally
-        {
-            _semaphore.Release();
         }
     }
 
     private async void PersistTimerCallback(object? state)
     {
-        await PersistPendingLogsAsync();
+        try
+        {
+            await PersistPendingLogsAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+        }
     }
 
     private async Task PersistPendingLogsAsync()
     {
-        await _semaphore.WaitAsync();
-        try
+        List<OperationLog>? allLogs = null;
+        lock (_lock)
         {
-            if (_pendingLogs.Count == 0)
+            if (_pendingLogs.Count == 0 || _disposed)
             {
                 return;
             }
-
-            var allLogs = Logs.ToList();
-            var json = JsonConvert.SerializeObject(allLogs, Formatting.Indented);
-            await File.WriteAllTextAsync(_logsFilePath, json);
+            allLogs = Logs.ToList();
             _pendingLogs.Clear();
+        }
+
+        try
+        {
+            var json = JsonConvert.SerializeObject(allLogs, Formatting.Indented);
+            await File.WriteAllTextAsync(_logsFilePath, json).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "持久化日志失败");
         }
-        finally
-        {
-            _semaphore.Release();
-        }
     }
 
-    public async Task<List<OperationLog>> SearchLogsAsync(string keyword, DateTime? start = null, DateTime? end = null)
+    public Task<List<OperationLog>> SearchLogsAsync(string keyword, DateTime? start = null, DateTime? end = null)
     {
-        await _semaphore.WaitAsync();
-        try
+        lock (_lock)
         {
-            var query = Logs.AsEnumerable();
+            IEnumerable<OperationLog> query = Logs;
 
             if (!string.IsNullOrWhiteSpace(keyword))
             {
@@ -174,11 +199,7 @@ public class LogService : ILogService, IDisposable
                 query = query.Where(x => x.Timestamp <= end.Value);
             }
 
-            return query.ToList();
-        }
-        finally
-        {
-            _semaphore.Release();
+            return Task.FromResult(query.ToList());
         }
     }
 
@@ -190,11 +211,11 @@ public class LogService : ILogService, IDisposable
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         if (ext == ".json")
         {
-            await ExportAsJsonAsync(filePath, logs);
+            await ExportAsJsonAsync(filePath, logs).ConfigureAwait(false);
         }
         else if (ext == ".csv")
         {
-            await ExportAsCsvAsync(filePath, logs);
+            await ExportAsCsvAsync(filePath, logs).ConfigureAwait(false);
         }
         else
         {
@@ -205,7 +226,7 @@ public class LogService : ILogService, IDisposable
     private static async Task ExportAsJsonAsync(string filePath, IEnumerable<OperationLog> logs)
     {
         var json = JsonConvert.SerializeObject(logs.ToList(), Formatting.Indented);
-        await File.WriteAllTextAsync(filePath, json, Encoding.UTF8);
+        await File.WriteAllTextAsync(filePath, json, Encoding.UTF8).ConfigureAwait(false);
     }
 
     private static async Task ExportAsCsvAsync(string filePath, IEnumerable<OperationLog> logs)
@@ -232,7 +253,7 @@ public class LogService : ILogService, IDisposable
             sb.AppendLine(CsvEscape(log.Details));
         }
 
-        await File.WriteAllTextAsync(filePath, sb.ToString(), new UTF8Encoding(true));
+        await File.WriteAllTextAsync(filePath, sb.ToString(), new UTF8Encoding(true)).ConfigureAwait(false);
     }
 
     private static string CsvEscape(string value)
@@ -257,39 +278,49 @@ public class LogService : ILogService, IDisposable
             throw new ArgumentException("保留天数必须大于0", nameof(retentionDays));
         }
 
-        await _semaphore.WaitAsync();
-        try
+        int removedCount = 0;
+        List<OperationLog> allLogs;
+
+        lock (_lock)
         {
             var cutoff = DateTime.Now.AddDays(-retentionDays);
             var toRemove = Logs.Where(x => x.Timestamp < cutoff).ToList();
-            var removedCount = 0;
 
-            foreach (var log in toRemove)
+            void RemoveLogs()
             {
-                Logs.Remove(log);
-                removedCount++;
-            }
-
-            if (removedCount > 0)
-            {
-                try
+                foreach (var log in toRemove)
                 {
-                    var allLogs = Logs.ToList();
-                    var json = JsonConvert.SerializeObject(allLogs, Formatting.Indented);
-                    await File.WriteAllTextAsync(_logsFilePath, json);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "清理日志后保存失败");
+                    Logs.Remove(log);
+                    removedCount++;
                 }
             }
 
-            return removedCount;
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.Invoke(RemoveLogs, DispatcherPriority.Background);
+            }
+            else
+            {
+                RemoveLogs();
+            }
+
+            allLogs = Logs.ToList();
         }
-        finally
+
+        if (removedCount > 0)
         {
-            _semaphore.Release();
+            try
+            {
+                var json = JsonConvert.SerializeObject(allLogs, Formatting.Indented);
+                await File.WriteAllTextAsync(_logsFilePath, json).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "清理日志后保存失败");
+            }
         }
+
+        return removedCount;
     }
 
     protected virtual void Dispose(bool disposing)
@@ -299,14 +330,22 @@ public class LogService : ILogService, IDisposable
             return;
         }
 
+        _disposed = true;
+
         if (disposing)
         {
-            _persistTimer.Dispose();
-            PersistPendingLogsAsync().GetAwaiter().GetResult();
-            _semaphore.Dispose();
-        }
+            _persistTimer?.Dispose();
+            _persistTimer = null;
 
-        _disposed = true;
+            try
+            {
+                Task.Run(async () => await PersistPendingLogsAsync().ConfigureAwait(false))
+                    .Wait(2000);
+            }
+            catch
+            {
+            }
+        }
     }
 
     public void Dispose()

@@ -46,7 +46,7 @@ public class SettingsService : ISettingsService
         {
             if (File.Exists(SettingsFilePath))
             {
-                var json = await File.ReadAllTextAsync(SettingsFilePath);
+                var json = await File.ReadAllTextAsync(SettingsFilePath).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
                     var loaded = JsonConvert.DeserializeObject<AppSettings>(json);
@@ -58,7 +58,7 @@ public class SettingsService : ISettingsService
                 }
             }
             Current = CreateDefaultSettings();
-            await SaveSettingsAsync();
+            await SaveSettingsAsync().ConfigureAwait(false);
         }
         catch
         {
@@ -72,7 +72,7 @@ public class SettingsService : ISettingsService
         {
             EnsureAppDataDirectory();
             var json = JsonConvert.SerializeObject(Current, Formatting.Indented);
-            await File.WriteAllTextAsync(SettingsFilePath, json);
+            await File.WriteAllTextAsync(SettingsFilePath, json).ConfigureAwait(false);
             SettingsChanged?.Invoke(this, EventArgs.Empty);
         }
         catch

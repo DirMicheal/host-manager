@@ -91,7 +91,7 @@ public partial class HostFileService : IHostFileService, IDisposable
 
         try
         {
-            await _semaphore.WaitAsync();
+            await _semaphore.WaitAsync().ConfigureAwait(false);
 
             if (!File.Exists(hostsPath))
             {
@@ -110,7 +110,7 @@ public partial class HostFileService : IHostFileService, IDisposable
                     _logger.LogWarning("获取 hosts 文件读取互斥锁超时");
                 }
 
-                var lines = await File.ReadAllLinesAsync(hostsPath, Encoding.UTF8);
+                var lines = await File.ReadAllLinesAsync(hostsPath, Encoding.UTF8).ConfigureAwait(false);
                 var lineNumber = 0;
 
                 foreach (var rawLine in lines)
@@ -315,11 +315,11 @@ public partial class HostFileService : IHostFileService, IDisposable
 
         try
         {
-            await _semaphore.WaitAsync();
+            await _semaphore.WaitAsync().ConfigureAwait(false);
 
             if (backupFirst && File.Exists(hostsPath))
             {
-                await CreateBackupAsync(hostsPath);
+                await CreateBackupAsync(hostsPath).ConfigureAwait(false);
             }
 
             using var mutex = new Mutex(false, FileLockMutexName);
@@ -368,11 +368,12 @@ public partial class HostFileService : IHostFileService, IDisposable
                     sb.AppendLine(line);
                 }
 
-                _fileWatcher!.EnableRaisingEvents = false;
+                if (_fileWatcher != null)
+                    _fileWatcher.EnableRaisingEvents = false;
 
                 try
                 {
-                    await File.WriteAllTextAsync(tempPath, sb.ToString(), new UTF8Encoding(true));
+                    await File.WriteAllTextAsync(tempPath, sb.ToString(), new UTF8Encoding(true)).ConfigureAwait(false);
 
                     if (File.Exists(hostsPath))
                     {
@@ -384,7 +385,8 @@ public partial class HostFileService : IHostFileService, IDisposable
                 }
                 finally
                 {
-                    _fileWatcher!.EnableRaisingEvents = true;
+                    if (_fileWatcher != null)
+                        _fileWatcher.EnableRaisingEvents = true;
                 }
             }
             finally
@@ -469,8 +471,8 @@ public partial class HostFileService : IHostFileService, IDisposable
             var backupFile = Path.Combine(backupDir,
                 $"hosts_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.bak");
 
-            var content = await File.ReadAllTextAsync(hostsPath, Encoding.UTF8);
-            await File.WriteAllTextAsync(backupFile, content, new UTF8Encoding(true));
+            var content = await File.ReadAllTextAsync(hostsPath, Encoding.UTF8).ConfigureAwait(false);
+            await File.WriteAllTextAsync(backupFile, content, new UTF8Encoding(true)).ConfigureAwait(false);
 
             _logger.LogInformation("创建 hosts 文件备份: {BackupPath}", backupFile);
             _logService.LogInfo("备份Hosts", "创建 hosts 文件备份", backupFile);
@@ -486,7 +488,7 @@ public partial class HostFileService : IHostFileService, IDisposable
     {
         _logger.LogInformation("请求管理员权限");
 
-        if (await IsAdminAsync())
+        if (await IsAdminAsync().ConfigureAwait(false))
         {
             _logger.LogInformation("当前进程已具有管理员权限");
             return true;

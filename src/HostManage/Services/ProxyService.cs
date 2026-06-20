@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows;
+using System.Windows.Threading;
 using HostManage.Models;
 using Microsoft.Win32;
 using Newtonsoft.Json;
@@ -15,6 +17,7 @@ public class ProxyService : IProxyService
     private static readonly string EncryptionKeyFilePath = Path.Combine(AppDataPath, "encryption.key");
 
     private readonly byte[] _encryptionKey;
+    private readonly object _lock = new();
 
     public ObservableCollection<ProxyConfig> Proxies { get; private set; }
 
@@ -23,7 +26,7 @@ public class ProxyService : IProxyService
         Proxies = new ObservableCollection<ProxyConfig>();
         EnsureAppDataDirectory();
         _encryptionKey = GetOrCreateEncryptionKey();
-        _ = LoadProxiesAsync();
+        LoadProxiesSync();
     }
 
     private static void EnsureAppDataDirectory()
@@ -50,29 +53,29 @@ public class ProxyService : IProxyService
         return key;
     }
 
-    private async Task LoadProxiesAsync()
+    private void LoadProxiesSync()
     {
-        try
+        lock (_lock)
         {
-            if (File.Exists(ProxiesFilePath))
+            try
             {
-                var json = await File.ReadAllTextAsync(ProxiesFilePath);
-                if (!string.IsNullOrWhiteSpace(json))
+                if (File.Exists(ProxiesFilePath))
                 {
-                    var list = JsonConvert.DeserializeObject<List<ProxyConfig>>(json);
-                    if (list != null)
+                    var json = File.ReadAllText(ProxiesFilePath);
+                    if (!string.IsNullOrWhiteSpace(json))
                     {
-                        foreach (var proxy in list)
+                        var list = JsonConvert.DeserializeObject<List<ProxyConfig>>(json);
+                        if (list != null)
                         {
-                            Proxies.Add(proxy);
+                            Proxies = new ObservableCollection<ProxyConfig>(list);
                         }
                     }
                 }
             }
-        }
-        catch
-        {
-            Proxies = new ObservableCollection<ProxyConfig>();
+            catch
+            {
+                Proxies = new ObservableCollection<ProxyConfig>();
+            }
         }
     }
 
@@ -81,8 +84,13 @@ public class ProxyService : IProxyService
         try
         {
             EnsureAppDataDirectory();
-            var json = JsonConvert.SerializeObject(Proxies.ToList(), Formatting.Indented);
-            await File.WriteAllTextAsync(ProxiesFilePath, json);
+            List<ProxyConfig> list;
+            lock (_lock)
+            {
+                list = Proxies.ToList();
+            }
+            var json = JsonConvert.SerializeObject(list, Formatting.Indented);
+            await File.WriteAllTextAsync(ProxiesFilePath, json).ConfigureAwait(false);
         }
         catch
         {
@@ -103,17 +111,36 @@ public class ProxyService : IProxyService
             proxy.Password = string.Empty;
         }
 
-        Proxies.Add(proxy);
-        await SaveProxiesAsync();
+        lock (_lock)
+        {
+            void Add() => Proxies.Add(proxy);
+            if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+                Application.Current.Dispatcher.Invoke(Add, DispatcherPriority.Background);
+            else
+                Add();
+        }
+        await SaveProxiesAsync().ConfigureAwait(false);
     }
 
     public async Task DeleteProxyAsync(Guid proxyId)
     {
-        var proxy = Proxies.FirstOrDefault(p => p.Id == proxyId);
-        if (proxy != null)
+        bool removed;
+        lock (_lock)
         {
-            Proxies.Remove(proxy);
-            await SaveProxiesAsync();
+            var proxy = Proxies.FirstOrDefault(p => p.Id == proxyId);
+            removed = proxy != null;
+            if (proxy != null)
+            {
+                void Remove() => Proxies.Remove(proxy);
+                if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+                    Application.Current.Dispatcher.Invoke(Remove, DispatcherPriority.Background);
+                else
+                    Remove();
+            }
+        }
+        if (removed)
+        {
+            await SaveProxiesAsync().ConfigureAwait(false);
         }
     }
 
@@ -122,20 +149,32 @@ public class ProxyService : IProxyService
         if (proxy == null)
             throw new ArgumentNullException(nameof(proxy));
 
-        var existing = Proxies.FirstOrDefault(p => p.Id == proxy.Id);
-        if (existing == null)
-            return;
-
-        var index = Proxies.IndexOf(existing);
-
-        if (!string.IsNullOrWhiteSpace(proxy.Password))
+        bool updated;
+        lock (_lock)
         {
-            proxy.EncryptedPassword = EncryptPassword(proxy.Password);
-            proxy.Password = string.Empty;
-        }
+            var existing = Proxies.FirstOrDefault(p => p.Id == proxy.Id);
+            updated = existing != null;
+            if (existing != null)
+            {
+                var index = Proxies.IndexOf(existing);
 
-        Proxies[index] = proxy;
-        await SaveProxiesAsync();
+                if (!string.IsNullOrWhiteSpace(proxy.Password))
+                {
+                    proxy.EncryptedPassword = EncryptPassword(proxy.Password);
+                    proxy.Password = string.Empty;
+                }
+
+                void Update() => Proxies[index] = proxy;
+                if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+                    Application.Current.Dispatcher.Invoke(Update, DispatcherPriority.Background);
+                else
+                    Update();
+            }
+        }
+        if (updated)
+        {
+            await SaveProxiesAsync().ConfigureAwait(false);
+        }
     }
 
     public string EncryptPassword(string plainText)
@@ -238,7 +277,7 @@ public class ProxyService : IProxyService
     {
         if (proxy == null)
         {
-            await ClearSystemProxyAsync();
+            await ClearSystemProxyAsync().ConfigureAwait(false);
             return;
         }
 
@@ -269,7 +308,7 @@ public class ProxyService : IProxyService
         {
         }
 
-        await Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     public async Task ClearSystemProxyAsync()
@@ -291,14 +330,14 @@ public class ProxyService : IProxyService
         {
         }
 
-        await Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     public async Task<ProxyConfig?> GetCurrentSystemProxyAsync()
     {
         try
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings", false);
             if (key == null)
                 return null;

@@ -40,7 +40,7 @@ public class NetworkService : INetworkService
             {
                 try
                 {
-                    var hostEntry = await Dns.GetHostEntryAsync(resolvedIp);
+                    var hostEntry = await Dns.GetHostEntryAsync(resolvedIp).ConfigureAwait(false);
                     if (hostEntry.AddressList.Length > 0)
                     {
                         resolvedIp = hostEntry.AddressList[0].ToString();
@@ -58,7 +58,7 @@ public class NetworkService : INetworkService
             var buffer = new byte[32];
             var options = new PingOptions(64, true);
 
-            var reply = await ping.SendPingAsync(resolvedIp, timeoutMs, buffer, options);
+            var reply = await ping.SendPingAsync(resolvedIp, timeoutMs, buffer, options).ConfigureAwait(false);
 
             if (reply.Status == IPStatus.Success)
             {
@@ -92,10 +92,10 @@ public class NetworkService : INetworkService
 
         var tasks = ipList.Select(async ip =>
         {
-            await semaphore.WaitAsync();
+            await semaphore.WaitAsync().ConfigureAwait(false);
             try
             {
-                var result = await PingAsync(ip, timeoutMs);
+                var result = await PingAsync(ip, timeoutMs).ConfigureAwait(false);
                 lock (lockObj)
                 {
                     results.Add(result);
@@ -110,7 +110,7 @@ public class NetworkService : INetworkService
             }
         });
 
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks).ConfigureAwait(false);
 
         return results;
     }
@@ -144,7 +144,7 @@ public class NetworkService : INetworkService
             {
                 try
                 {
-                    var hostEntry = await Dns.GetHostEntryAsync(resolvedIp);
+                    var hostEntry = await Dns.GetHostEntryAsync(resolvedIp).ConfigureAwait(false);
                     if (hostEntry.AddressList.Length > 0)
                     {
                         address = hostEntry.AddressList[0];
@@ -170,7 +170,7 @@ public class NetworkService : INetworkService
 
             try
             {
-                await client.ConnectAsync(address, port, connectTimeout.Token);
+                await client.ConnectAsync(address, port, connectTimeout.Token).ConfigureAwait(false);
                 result.IsOpen = true;
             }
             catch (OperationCanceledException)
@@ -220,10 +220,10 @@ public class NetworkService : INetworkService
 
         var tasks = targetList.Select(async target =>
         {
-            await semaphore.WaitAsync();
+            await semaphore.WaitAsync().ConfigureAwait(false);
             try
             {
-                var result = await TestPortAsync(target.ip, target.port, timeoutMs);
+                var result = await TestPortAsync(target.ip, target.port, timeoutMs).ConfigureAwait(false);
                 lock (lockObj)
                 {
                     results.Add(result);
@@ -238,7 +238,7 @@ public class NetworkService : INetworkService
             }
         });
 
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks).ConfigureAwait(false);
 
         return results;
     }

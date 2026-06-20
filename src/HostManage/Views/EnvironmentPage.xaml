@@ -28,7 +28,7 @@
                     </Button.ContentTemplate>
                 </Button>
                 <Button Content="复制" Style="{StaticResource MaterialDesignRaisedButton}"
-                        Command="{Binding DuplicateCommand}" Margin="0,0,8,0">
+                        Command="{Binding CopyCommand}" Margin="0,0,8,0">
                     <Button.ContentTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
@@ -39,7 +39,7 @@
                     </Button.ContentTemplate>
                 </Button>
                 <Button Content="重命名" Style="{StaticResource MaterialDesignRaisedButton}"
-                        Command="{Binding RenameCommand}" Margin="0,0,8,0">
+                        Command="{Binding EditCommand}" Margin="0,0,8,0">
                     <Button.ContentTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
@@ -82,17 +82,7 @@
                         </DataTemplate>
                     </Button.ContentTemplate>
                 </Button>
-                <Button Content="导出环境" Style="{StaticResource MaterialDesignRaisedButton}"
-                        Command="{Binding ExportCommand}" Margin="0,0,8,0">
-                    <Button.ContentTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Export" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBlock Text="导出" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </Button.ContentTemplate>
-                </Button>
+
             </StackPanel>
         </materialDesign:ColorZone>
 
@@ -232,7 +222,18 @@
                                             </Style>
                                         </Ellipse.Style>
                                     </Ellipse>
-                                    <TextBlock Text="{Binding SelectedEnvironment.IsActive, Converter={StaticResource BooleanToActiveTextConverter}}" VerticalAlignment="Center"/>
+                                    <TextBlock VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="未激活"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding SelectedEnvironment.IsActive}" Value="True">
+                                                        <Setter Property="Text" Value="活动中"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
                                 <TextBlock Grid.Row="3" Grid.Column="0" Text="创建时间:" VerticalAlignment="Center" Margin="0,4"/>
                                 <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedEnvironment.CreatedAt, StringFormat='yyyy-MM-dd HH:mm:ss'}" VerticalAlignment="Center" Margin="0,4"/>

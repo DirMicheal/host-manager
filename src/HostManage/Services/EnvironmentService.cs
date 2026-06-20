@@ -31,7 +31,7 @@ public class EnvironmentService : IEnvironmentService
 
     public async Task CreateEnvironmentAsync(string name, string description, HostEnvironment? copyFrom = null)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -64,7 +64,7 @@ public class EnvironmentService : IEnvironmentService
             }
 
             Environments.Add(env);
-            await SaveEnvironmentsInternalAsync();
+            await SaveEnvironmentsInternalAsync().ConfigureAwait(false);
 
             _logService.LogAction("创建环境", $"成功创建环境 \"{name}\"", copyFrom != null ? $"从环境 \"{copyFrom.Name}\" 复制规则" : null);
         }
@@ -81,7 +81,7 @@ public class EnvironmentService : IEnvironmentService
 
     public async Task DeleteEnvironmentAsync(Guid envId)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             var env = Environments.FirstOrDefault(e => e.Id == envId);
@@ -93,7 +93,7 @@ public class EnvironmentService : IEnvironmentService
 
             var name = env.Name;
             Environments.Remove(env);
-            await SaveEnvironmentsInternalAsync();
+            await SaveEnvironmentsInternalAsync().ConfigureAwait(false);
 
             _logService.LogAction("删除环境", $"成功删除环境 \"{name}\"");
         }
@@ -110,7 +110,7 @@ public class EnvironmentService : IEnvironmentService
 
     public async Task SwitchEnvironmentAsync(Guid envId)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             var env = Environments.FirstOrDefault(e => e.Id == envId);
@@ -123,7 +123,7 @@ public class EnvironmentService : IEnvironmentService
             }
 
             var rules = env.Rules.Where(r => r.IsEnabled).ToList();
-            await _hostFileService.WriteSystemHostsAsync(rules, true);
+            await _hostFileService.WriteSystemHostsAsync(rules, true).ConfigureAwait(false);
 
             ProxyConfig? proxyConfig = null;
             if (env.ProxyId.HasValue)
@@ -133,14 +133,14 @@ public class EnvironmentService : IEnvironmentService
 
             if (proxyConfig != null)
             {
-                await _proxyService.ApplySystemProxyAsync(proxyConfig);
+                await _proxyService.ApplySystemProxyAsync(proxyConfig).ConfigureAwait(false);
             }
             else
             {
-                await _proxyService.ClearSystemProxyAsync();
+                await _proxyService.ClearSystemProxyAsync().ConfigureAwait(false);
             }
 
-            await SaveEnvironmentsInternalAsync();
+            await SaveEnvironmentsInternalAsync().ConfigureAwait(false);
 
             _logService.LogAction("切换环境", $"成功切换到环境 \"{env.Name}\"", $"规则数: {rules.Count}, 代理: {proxyConfig?.Name ?? "无"}");
         }
@@ -157,7 +157,7 @@ public class EnvironmentService : IEnvironmentService
 
     public async Task UpdateEnvironmentAsync(HostEnvironment env)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             var existing = Environments.FirstOrDefault(e => e.Id == env.Id);
@@ -176,7 +176,7 @@ public class EnvironmentService : IEnvironmentService
             if (existing.IsActive)
             {
                 var rules = existing.Rules.Where(r => r.IsEnabled).ToList();
-                await _hostFileService.WriteSystemHostsAsync(rules, true);
+                await _hostFileService.WriteSystemHostsAsync(rules, true).ConfigureAwait(false);
 
                 ProxyConfig? proxyConfig = null;
                 if (existing.ProxyId.HasValue)
@@ -186,15 +186,15 @@ public class EnvironmentService : IEnvironmentService
 
                 if (proxyConfig != null)
                 {
-                    await _proxyService.ApplySystemProxyAsync(proxyConfig);
+                    await _proxyService.ApplySystemProxyAsync(proxyConfig).ConfigureAwait(false);
                 }
                 else
                 {
-                    await _proxyService.ClearSystemProxyAsync();
+                    await _proxyService.ClearSystemProxyAsync().ConfigureAwait(false);
                 }
             }
 
-            await SaveEnvironmentsInternalAsync();
+            await SaveEnvironmentsInternalAsync().ConfigureAwait(false);
 
             _logService.LogAction("更新环境", $"成功更新环境 \"{existing.Name}\"");
         }
@@ -219,7 +219,7 @@ public class EnvironmentService : IEnvironmentService
             if (env == null)
                 throw new ArgumentException($"未找到ID为 {envId} 的环境", nameof(envId));
 
-            var systemRules = await _hostFileService.ReadSystemHostsAsync();
+            var systemRules = await _hostFileService.ReadSystemHostsAsync().ConfigureAwait(false);
             var envRules = env.Rules.Where(r => r.IsEnabled).ToList();
 
             var systemDict = new Dictionary<string, HostRule>(StringComparer.OrdinalIgnoreCase);
@@ -294,10 +294,10 @@ public class EnvironmentService : IEnvironmentService
 
     public async Task SaveEnvironmentsAsync()
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            await SaveEnvironmentsInternalAsync();
+            await SaveEnvironmentsInternalAsync().ConfigureAwait(false);
         }
         finally
         {
@@ -307,7 +307,7 @@ public class EnvironmentService : IEnvironmentService
 
     public async Task LoadEnvironmentsAsync()
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             if (!Directory.Exists(_dataDirectory))
@@ -317,7 +317,7 @@ public class EnvironmentService : IEnvironmentService
 
             if (File.Exists(_environmentsFilePath))
             {
-                var json = await File.ReadAllTextAsync(_environmentsFilePath);
+                var json = await File.ReadAllTextAsync(_environmentsFilePath).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
                     var list = JsonConvert.DeserializeObject<List<HostEnvironment>>(json);
@@ -330,7 +330,7 @@ public class EnvironmentService : IEnvironmentService
             }
 
             CreateDefaultEnvironment();
-            await SaveEnvironmentsInternalAsync();
+            await SaveEnvironmentsInternalAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -366,7 +366,7 @@ public class EnvironmentService : IEnvironmentService
 
             var list = Environments.ToList();
             var json = JsonConvert.SerializeObject(list, Formatting.Indented);
-            await File.WriteAllTextAsync(_environmentsFilePath, json);
+            await File.WriteAllTextAsync(_environmentsFilePath, json).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

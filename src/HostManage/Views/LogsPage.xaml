@@ -34,7 +34,7 @@
                                 SelectedDate="{Binding EndDate}"
                                 Width="160" VerticalAlignment="Center" Margin="0,0,16,0"/>
                     <TextBlock Text="级别:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox ItemsSource="{Binding LogLevels}"
+                    <ComboBox ItemsSource="{Binding LevelOptions}"
                               SelectedItem="{Binding SelectedLevel}"
                               Width="120" VerticalAlignment="Center">
                         <ComboBox.ItemTemplate>

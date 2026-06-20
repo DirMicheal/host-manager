@@ -30,11 +30,11 @@ public class BackupService : IBackupService
 
     public async Task<BackupSnapshot> CreateBackupAsync(string? name = null, bool isManual = true)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             EnsureDirectories();
-            await LoadSnapshotsInternalAsync();
+            await LoadSnapshotsInternalAsync().ConfigureAwait(false);
 
             var hostsFilePath = _hostFileService.GetHostsFilePath();
             if (!File.Exists(hostsFilePath))
@@ -50,7 +50,7 @@ public class BackupService : IBackupService
                 File.Copy(hostsFilePath, backupFilePath, true);
             }
 
-            var content = await File.ReadAllBytesAsync(backupFilePath);
+            var content = await File.ReadAllBytesAsync(backupFilePath).ConfigureAwait(false);
             var contentHash = ComputeSha256Hash(content);
             var size = content.Length;
 
@@ -66,7 +66,7 @@ public class BackupService : IBackupService
             };
 
             Snapshots.Add(snapshot);
-            await SaveSnapshotsInternalAsync();
+            await SaveSnapshotsInternalAsync().ConfigureAwait(false);
 
             _logService.LogAction("创建备份", $"成功创建备份 \"{snapshot.Name}\"", $"文件: {backupFileName}, 大小: {FormatSize(size)}");
 
@@ -85,7 +85,7 @@ public class BackupService : IBackupService
 
     public async Task RestoreBackupAsync(Guid snapshotId)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             var snapshot = Snapshots.FirstOrDefault(s => s.Id == snapshotId);
@@ -101,11 +101,11 @@ public class BackupService : IBackupService
             {
                 if (File.Exists(hostsFilePath))
                 {
-                    var currentContent = await File.ReadAllBytesAsync(hostsFilePath);
+                    var currentContent = await File.ReadAllBytesAsync(hostsFilePath).ConfigureAwait(false);
                     var currentHash = ComputeSha256Hash(currentContent);
                     if (!currentHash.Equals(snapshot.ContentHash, StringComparison.OrdinalIgnoreCase))
                     {
-                        var preRestoreBackup = await CreateBackupAsync("恢复前自动备份", false);
+                        var preRestoreBackup = await CreateBackupAsync("恢复前自动备份", false).ConfigureAwait(false);
                         _logService.LogInfo("恢复备份", $"已在恢复前创建备份: {preRestoreBackup.Name}");
                     }
                 }
@@ -128,7 +128,7 @@ public class BackupService : IBackupService
 
     public async Task DeleteBackupAsync(Guid snapshotId)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             var snapshot = Snapshots.FirstOrDefault(s => s.Id == snapshotId);
@@ -144,7 +144,7 @@ public class BackupService : IBackupService
             }
 
             Snapshots.Remove(snapshot);
-            await SaveSnapshotsInternalAsync();
+            await SaveSnapshotsInternalAsync().ConfigureAwait(false);
 
             _logService.LogAction("删除备份", $"成功删除备份 \"{name}\"");
         }
@@ -161,11 +161,11 @@ public class BackupService : IBackupService
 
     public async Task<int> CleanupOldBackupsAsync(int maxCount = 30)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             EnsureDirectories();
-            await LoadSnapshotsInternalAsync();
+            await LoadSnapshotsInternalAsync().ConfigureAwait(false);
 
             if (maxCount <= 0)
                 throw new ArgumentException("最大保留数量必须大于0", nameof(maxCount));
@@ -198,7 +198,7 @@ public class BackupService : IBackupService
 
             if (removedCount > 0)
             {
-                await SaveSnapshotsInternalAsync();
+                await SaveSnapshotsInternalAsync().ConfigureAwait(false);
                 _logService.LogAction("清理备份", $"成功清理 {removedCount} 个旧备份，保留最近 {maxCount} 个");
             }
 
@@ -240,7 +240,7 @@ public class BackupService : IBackupService
 
             using var sourceStream = new FileStream(snapshot.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var targetStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await sourceStream.CopyToAsync(targetStream);
+            await sourceStream.CopyToAsync(targetStream).ConfigureAwait(false);
 
             _logService.LogAction("导出备份", $"成功导出备份 \"{snapshot.Name}\" 到 \"{targetPath}\"");
 
@@ -255,14 +255,14 @@ public class BackupService : IBackupService
 
     public async Task ImportBackupAsync(string sourcePath)
     {
-        await _semaphore.WaitAsync();
+        await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             if (!File.Exists(sourcePath))
                 throw new FileNotFoundException($"源文件不存在: {sourcePath}", sourcePath);
 
             EnsureDirectories();
-            await LoadSnapshotsInternalAsync();
+            await LoadSnapshotsInternalAsync().ConfigureAwait(false);
 
             var timestamp = DateTime.Now;
             var timestampStr = timestamp.ToString("yyyyMMdd_HHmmss_fff");
@@ -272,7 +272,7 @@ public class BackupService : IBackupService
 
             File.Copy(sourcePath, backupFilePath, true);
 
-            var content = await File.ReadAllBytesAsync(backupFilePath);
+            var content = await File.ReadAllBytesAsync(backupFilePath).ConfigureAwait(false);
             var contentHash = ComputeSha256Hash(content);
             var size = content.Length;
 
@@ -288,7 +288,7 @@ public class BackupService : IBackupService
             };
 
             Snapshots.Add(snapshot);
-            await SaveSnapshotsInternalAsync();
+            await SaveSnapshotsInternalAsync().ConfigureAwait(false);
 
             _logService.LogAction("导入备份", $"成功导入备份 \"{snapshot.Name}\"", $"源文件: {sourcePath}");
         }
@@ -325,7 +325,7 @@ public class BackupService : IBackupService
         {
             if (File.Exists(_snapshotsFilePath))
             {
-                var json = await File.ReadAllTextAsync(_snapshotsFilePath);
+                var json = await File.ReadAllTextAsync(_snapshotsFilePath).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
                     var list = JsonConvert.DeserializeObject<List<BackupSnapshot>>(json);
@@ -344,7 +344,7 @@ public class BackupService : IBackupService
 
                         if (validSnapshots.Count != list.Count)
                         {
-                            await SaveSnapshotsInternalAsync();
+                            await SaveSnapshotsInternalAsync().ConfigureAwait(false);
                         }
 
                         return;
@@ -369,7 +369,7 @@ public class BackupService : IBackupService
 
             var list = Snapshots.OrderByDescending(s => s.Timestamp).ToList();
             var json = JsonConvert.SerializeObject(list, Formatting.Indented);
-            await File.WriteAllTextAsync(_snapshotsFilePath, json);
+            await File.WriteAllTextAsync(_snapshotsFilePath, json).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

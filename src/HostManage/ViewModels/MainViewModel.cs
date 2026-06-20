@@ -27,6 +27,8 @@ public class MainViewModel : ViewModelBase
     private ObservableCollection<HostRule> _allRules = new();
     private ObservableCollection<HostRule> _filteredRules = new();
     private List<HostRule> _selectedRules = new();
+    private int _currentPage = 1;
+    private int _pageSize = 20;
 
     public string Title
     {
@@ -67,6 +69,17 @@ public class MainViewModel : ViewModelBase
     }
 
     public int EnabledCount => _allRules.Count(r => r.IsEnabled);
+    public int DisabledCount => _allRules.Count(r => !r.IsEnabled);
+    public int ConflictCount => _allRules.Count(r => r.Status == RuleStatus.Conflict);
+    public int TotalCount => _allRules.Count;
+
+    public int CurrentPage
+    {
+        get => _currentPage;
+        set => SetProperty(ref _currentPage, value);
+    }
+
+    public int TotalPages => _pageSize > 0 ? (int)Math.Ceiling((double)_allRules.Count / _pageSize) : 1;
 
     public List<HostRule> SelectedRules
     {
@@ -95,6 +108,13 @@ public class MainViewModel : ViewModelBase
     public RelayCommand OpenSettingsCommand { get; }
     public RelayCommand OpenLogsCommand { get; }
     public RelayCommand OpenBackupCommand { get; }
+    public AsyncRelayCommand ScanConflictCommand { get; }
+    public AsyncRelayCommand ValidateCommand { get; }
+    public AsyncRelayCommand EnableAllCommand { get; }
+    public AsyncRelayCommand DisableAllCommand { get; }
+    public AsyncRelayCommand<HostRule> TestIpCommand { get; }
+    public RelayCommand PreviousPageCommand { get; }
+    public RelayCommand NextPageCommand { get; }
 
     public MainViewModel(
         IEnvironmentService environmentService,
@@ -136,6 +156,13 @@ public class MainViewModel : ViewModelBase
         OpenSettingsCommand = new RelayCommand(ExecuteOpenSettings);
         OpenLogsCommand = new RelayCommand(ExecuteOpenLogs);
         OpenBackupCommand = new RelayCommand(ExecuteOpenBackup);
+        ScanConflictCommand = new AsyncRelayCommand(ExecuteScanConflictAsync, () => CurrentEnvironment != null);
+        ValidateCommand = new AsyncRelayCommand(ExecuteValidateAsync, () => CurrentEnvironment != null);
+        EnableAllCommand = new AsyncRelayCommand(ExecuteBatchEnableAsync, () => CurrentEnvironment != null);
+        DisableAllCommand = new AsyncRelayCommand(ExecuteBatchDisableAsync, () => CurrentEnvironment != null);
+        TestIpCommand = new AsyncRelayCommand<HostRule>(ExecuteTestIpAsync, _ => true);
+        PreviousPageCommand = new RelayCommand(ExecutePreviousPage, () => CurrentPage > 1);
+        NextPageCommand = new RelayCommand(ExecuteNextPage, () => CurrentPage < TotalPages);
     }
 
     public override async Task LoadAsync()
@@ -551,5 +578,103 @@ public class MainViewModel : ViewModelBase
         var window = Application.Current.MainWindow;
         if (window is MainWindow mw)
             mw.NavigationListBox.SelectedIndex = 3;
+    }
+
+    private async Task ExecuteScanConflictAsync()
+    {
+        _logService.LogAction("Rule_ScanConflict", "开始冲突扫描");
+        IsBusy = true;
+        BusyMessage = "正在扫描冲突...";
+
+        try
+        {
+            var conflictGroups = _allRules
+                .Where(r => r.IsEnabled && !string.IsNullOrWhiteSpace(r.Domain))
+                .GroupBy(r => r.Domain.ToLower())
+                .Where(g => g.Count() > 1)
+                .ToList();
+
+            foreach (var group in conflictGroups)
+            {
+                foreach (var rule in group)
+                {
+                    rule.Status = RuleStatus.Conflict;
+                }
+            }
+
+            ApplyFilter();
+            OnPropertyChanged(nameof(ConflictCount));
+            _logService.LogAction("Rule_ScanConflict", $"冲突扫描完成，发现 {conflictGroups.Count} 组冲突");
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError("Rule_ScanConflict", "冲突扫描失败", ex.ToString());
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyMessage = string.Empty;
+        }
+    }
+
+    private async Task ExecuteValidateAsync()
+    {
+        _logService.LogAction("Rule_Validate", "开始语法校验");
+        IsBusy = true;
+        BusyMessage = "正在校验...";
+
+        try
+        {
+            var invalidCount = 0;
+            foreach (var rule in _allRules)
+            {
+                var result = _validationService.ValidateHostRule(rule);
+                if (!result.IsValid)
+                {
+                    rule.Status = RuleStatus.Invalid;
+                    invalidCount++;
+                }
+            }
+
+            ApplyFilter();
+            _logService.LogAction("Rule_Validate", $"语法校验完成，发现 {invalidCount} 条无效规则");
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError("Rule_Validate", "语法校验失败", ex.ToString());
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyMessage = string.Empty;
+        }
+    }
+
+    private async Task ExecuteTestIpAsync(HostRule? rule)
+    {
+        if (rule == null) return;
+        _logService.LogAction("Rule_TestIp", $"测试IP: {rule.IP}");
+
+        try
+        {
+            var result = await _networkService.PingAsync(rule.IP, 5000);
+            _logService.LogAction("Rule_TestIp", $"IP测试完成: {rule.IP} - {(result.Success ? $"{result.RoundtripTime}ms" : result.ErrorMessage)}");
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError("Rule_TestIp", "IP测试失败", ex.ToString());
+        }
+    }
+
+    private void ExecutePreviousPage()
+    {
+        if (CurrentPage > 1)
+            CurrentPage--;
+    }
+
+    private void ExecuteNextPage()
+    {
+        if (CurrentPage < TotalPages)
+            CurrentPage++;
     }
 }

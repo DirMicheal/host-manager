@@ -177,7 +177,7 @@
                                     </Button.ContentTemplate>
                                 </Button>
                                 <Button Content="测试IP" Style="{StaticResource MaterialDesignIconForegroundButton}"
-                                        Command="{Binding DataContext.TestIpCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        Command="{Binding DataContext.TestIpCommand, ElementName=RulesDataGrid}"
                                         CommandParameter="{Binding}" Margin="2,0" Padding="6,2">
                                     <Button.ContentTemplate>
                                         <DataTemplate>
@@ -220,7 +220,7 @@
                     <TextBlock Text="{Binding TotalPages}" VerticalAlignment="Center" Margin="8,0" MinWidth="30"/>
                     <Button Content="下一页" Style="{StaticResource MaterialDesignIconForegroundButton}" Command="{Binding NextPageCommand}"/>
                 </StackPanel>
-                <ComboBox Grid.Column="2" Width="100" SelectedIndex="0" VerticalAlignment="Center">
+                <ComboBox Grid.Column="2" Width="100" SelectedIndex="{Binding PageSizeIndex, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center">
                     <ComboBoxItem Content="20条/页"/>
                     <ComboBoxItem Content="50条/页"/>
                     <ComboBoxItem Content="100条/页"/>

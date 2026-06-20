@@ -11,7 +11,7 @@ public partial class App : Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -26,15 +26,15 @@ public partial class App : Application
         try
         {
             var settingsService = Services.GetRequiredService<ISettingsService>();
-            settingsService.LoadSettingsAsync().Wait();
-
             var environmentService = Services.GetRequiredService<IEnvironmentService>();
-            environmentService.LoadEnvironmentsAsync().Wait();
-
             var logService = Services.GetRequiredService<ILogService>();
+            var themeService = Services.GetRequiredService<IThemeService>();
+
+            await settingsService.LoadSettingsAsync();
+            await environmentService.LoadEnvironmentsAsync();
+
             logService.LogAction("App_Startup", "应用程序启动");
 
-            var themeService = Services.GetRequiredService<IThemeService>();
             themeService.ApplyTheme(settingsService.Current.Theme);
 
             var mainWindow = Services.GetRequiredService<MainWindow>();
@@ -91,22 +91,23 @@ public partial class App : Application
     {
         try
         {
-            var settingsService = Services?.GetService<ISettingsService>();
-            if (settingsService != null)
-            {
-                var saveTask = settingsService.SaveSettingsAsync();
-                saveTask.Wait(2000);
-            }
-
-            var environmentService = Services?.GetService<IEnvironmentService>();
-            if (environmentService != null)
-            {
-                var saveTask = environmentService.SaveEnvironmentsAsync();
-                saveTask.Wait(2000);
-            }
-
             var logService = Services?.GetService<ILogService>();
             logService?.LogAction("App_Exit", "应用程序关闭");
+
+            Task.Run(async () =>
+            {
+                var settingsService = Services?.GetService<ISettingsService>();
+                if (settingsService != null)
+                {
+                    await settingsService.SaveSettingsAsync();
+                }
+
+                var environmentService = Services?.GetService<IEnvironmentService>();
+                if (environmentService != null)
+                {
+                    await environmentService.SaveEnvironmentsAsync();
+                }
+            }).Wait(3000);
         }
         catch
         {

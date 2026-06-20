@@ -44,7 +44,7 @@ public class ImportExportService : IImportExportService
                 throw new FileNotFoundException($"文件不存在: {filePath}", filePath);
             }
 
-            var content = await File.ReadAllTextAsync(filePath, Encoding.UTF8);
+            var content = await File.ReadAllTextAsync(filePath, Encoding.UTF8).ConfigureAwait(false);
             rules = ParseHostsContent(content);
 
             _logService.LogAction("导入Hosts文件", $"成功从 hosts 文件导入 {rules.Count} 条规则", filePath);
@@ -72,7 +72,7 @@ public class ImportExportService : IImportExportService
                 throw new FileNotFoundException($"文件不存在: {filePath}", filePath);
             }
 
-            var json = await File.ReadAllTextAsync(filePath, Encoding.UTF8);
+            var json = await File.ReadAllTextAsync(filePath, Encoding.UTF8).ConfigureAwait(false);
             var list = JsonConvert.DeserializeObject<List<HostRule>>(json);
 
             if (list != null)
@@ -121,7 +121,7 @@ public class ImportExportService : IImportExportService
                 throw new FileNotFoundException($"文件不存在: {filePath}", filePath);
             }
 
-            var lines = await File.ReadAllLinesAsync(filePath, Encoding.UTF8);
+            var lines = await File.ReadAllLinesAsync(filePath, Encoding.UTF8).ConfigureAwait(false);
 
             if (lines.Length == 0)
             {
@@ -233,7 +233,7 @@ public class ImportExportService : IImportExportService
                 sb.AppendLine(line);
             }
 
-            await File.WriteAllTextAsync(filePath, sb.ToString(), new UTF8Encoding(true));
+            await File.WriteAllTextAsync(filePath, sb.ToString(), new UTF8Encoding(true)).ConfigureAwait(false);
 
             _logService.LogAction("导出Hosts文件", $"成功导出 {ruleList.Count} 条规则到 hosts 格式文件", filePath);
         }
@@ -260,7 +260,7 @@ public class ImportExportService : IImportExportService
 
             var ruleList = rules.ToList();
             var json = JsonConvert.SerializeObject(ruleList, Formatting.Indented);
-            await File.WriteAllTextAsync(filePath, json, Encoding.UTF8);
+            await File.WriteAllTextAsync(filePath, json, Encoding.UTF8).ConfigureAwait(false);
 
             _logService.LogAction("导出JSON", $"成功导出 {ruleList.Count} 条规则到 JSON 文件", filePath);
         }
@@ -300,7 +300,7 @@ public class ImportExportService : IImportExportService
                 sb.AppendLine(CsvEscape(rule.Comment));
             }
 
-            await File.WriteAllTextAsync(filePath, sb.ToString(), new UTF8Encoding(true));
+            await File.WriteAllTextAsync(filePath, sb.ToString(), new UTF8Encoding(true)).ConfigureAwait(false);
 
             _logService.LogAction("导出CSV", $"成功导出 {ruleList.Count} 条规则到 CSV 文件", filePath);
         }
@@ -358,7 +358,7 @@ public class ImportExportService : IImportExportService
             {
                 foreach (var env in config.Environments)
                 {
-                    await _environmentService.CreateEnvironmentAsync(env.Name, env.Description);
+                    await _environmentService.CreateEnvironmentAsync(env.Name, env.Description).ConfigureAwait(false);
 
                     var newEnv = _environmentService.Environments.FirstOrDefault(e => e.Name == env.Name);
                     if (newEnv != null)
@@ -385,7 +385,7 @@ public class ImportExportService : IImportExportService
                     {
                         proxy.EncryptedPassword = _proxyService.EncryptPassword(proxy.Password);
                     }
-                    await _proxyService.AddProxyAsync(proxy);
+                    await _proxyService.AddProxyAsync(proxy).ConfigureAwait(false);
                 }
             }
 
@@ -397,8 +397,8 @@ public class ImportExportService : IImportExportService
                 }
             }
 
-            await _environmentService.SaveEnvironmentsAsync();
-            await _settingsService.SaveSettingsAsync();
+            await _environmentService.SaveEnvironmentsAsync().ConfigureAwait(false);
+            await _settingsService.SaveSettingsAsync().ConfigureAwait(false);
 
             _logService.LogAction("导入完整配置", "成功导入完整配置");
         }
