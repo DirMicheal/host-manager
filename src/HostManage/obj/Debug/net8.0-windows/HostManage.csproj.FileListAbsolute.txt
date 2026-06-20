@@ -78,3 +78,4 @@ d:\solo\hostManage\src\HostManage\obj\Debug\net8.0-windows\Dialogs\TutorialDialo
 d:\solo\hostManage\src\HostManage\obj\Debug\net8.0-windows\Dialogs\UpdateDialog.g.cs
 d:\solo\hostManage\src\HostManage\obj\Debug\net8.0-windows\Dialogs\AboutDialog.baml
 d:\solo\hostManage\src\HostManage\obj\Debug\net8.0-windows\Dialogs\AboutDialog.g.cs
+D:\solo\hostManage\src\HostManage\obj\Debug\net8.0-windows\HostManage.sourcelink.json
