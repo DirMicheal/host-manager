@@ -7,9 +7,9 @@ public partial class EnvironmentDialog : Window
 {
     public string DialogTitle { get; set; } = "新建环境";
 
-    public string EnvName { get; set; } = string.Empty;
+    public string EnvironmentName { get; set; } = string.Empty;
 
-    public string Description { get; set; } = string.Empty;
+    public string EnvironmentDescription { get; set; } = string.Empty;
 
     public HostEnvironment? Result { get; private set; }
 
@@ -23,13 +23,13 @@ public partial class EnvironmentDialog : Window
     public EnvironmentDialog(HostEnvironment environment) : this()
     {
         DialogTitle = "编辑环境";
-        EnvName = environment.Name;
-        Description = environment.Description;
+        EnvironmentName = environment.Name;
+        EnvironmentDescription = environment.Description;
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(EnvName))
+        if (string.IsNullOrWhiteSpace(EnvironmentName))
         {
             MessageBox.Show("环境名称不能为空", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             NameTextBox.Focus();
@@ -38,8 +38,8 @@ public partial class EnvironmentDialog : Window
 
         Result = new HostEnvironment
         {
-            Name = EnvName.Trim(),
-            Description = Description?.Trim() ?? string.Empty,
+            Name = EnvironmentName.Trim(),
+            Description = EnvironmentDescription?.Trim() ?? string.Empty,
             UpdatedAt = DateTime.Now
         };
 

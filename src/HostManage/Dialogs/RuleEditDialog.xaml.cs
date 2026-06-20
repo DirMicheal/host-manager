@@ -102,7 +102,7 @@ public partial class RuleEditDialog : Window
         IP = rule.IP;
         Domain = rule.Domain;
         Comment = rule.Comment;
-        IsEnabled = rule.IsEnabled;
+        RuleIsEnabled = rule.IsEnabled;
     }
 
     private void ValidateIP()
@@ -187,7 +187,7 @@ public partial class RuleEditDialog : Window
             IP = IP.Trim(),
             Domain = Domain.Trim(),
             Comment = Comment?.Trim() ?? string.Empty,
-            IsEnabled = IsEnabled,
+            IsEnabled = RuleIsEnabled,
             UpdatedAt = DateTime.Now
         };
 

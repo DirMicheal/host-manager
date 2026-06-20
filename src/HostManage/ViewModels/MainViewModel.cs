@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using HostManage.Dialogs;
 using HostManage.Models;
 using HostManage.Services;
+using Microsoft.Win32;
 
 namespace HostManage.ViewModels;
 
@@ -50,17 +52,21 @@ public class MainViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _searchKeyword, value))
-            {
                 ApplyFilter();
-            }
         }
     }
 
     public ObservableCollection<HostRule> FilteredRules
     {
         get => _filteredRules;
-        set => SetProperty(ref _filteredRules, value);
+        set
+        {
+            if (SetProperty(ref _filteredRules, value))
+                OnPropertyChanged(nameof(EnabledCount));
+        }
     }
+
+    public int EnabledCount => _allRules.Count(r => r.IsEnabled);
 
     public List<HostRule> SelectedRules
     {
@@ -119,8 +125,8 @@ public class MainViewModel : ViewModelBase
         ToggleRuleCommand = new AsyncRelayCommand<HostRule>(ExecuteToggleRuleAsync, _ => true);
         RefreshCommand = new AsyncRelayCommand(ExecuteRefreshAsync);
         SearchCommand = new RelayCommand(ApplyFilter);
-        BatchEnableCommand = new AsyncRelayCommand(ExecuteBatchEnableAsync, () => SelectedRules.Count > 0);
-        BatchDisableCommand = new AsyncRelayCommand(ExecuteBatchDisableAsync, () => SelectedRules.Count > 0);
+        BatchEnableCommand = new AsyncRelayCommand(ExecuteBatchEnableAsync, () => CurrentEnvironment != null);
+        BatchDisableCommand = new AsyncRelayCommand(ExecuteBatchDisableAsync, () => CurrentEnvironment != null);
         BatchDeleteCommand = new AsyncRelayCommand(ExecuteBatchDeleteAsync, () => SelectedRules.Count > 0);
         ImportCommand = new AsyncRelayCommand(ExecuteImportAsync);
         ExportCommand = new AsyncRelayCommand(ExecuteExportAsync, () => FilteredRules.Count > 0);
@@ -140,9 +146,7 @@ public class MainViewModel : ViewModelBase
 
         try
         {
-            await _settingsService.LoadSettingsAsync();
-            await _environmentService.LoadEnvironmentsAsync();
-
+            await Task.CompletedTask;
             CurrentEnvironment = _environmentService.CurrentEnvironment;
             if (CurrentEnvironment != null)
             {
@@ -165,20 +169,19 @@ public class MainViewModel : ViewModelBase
 
     private void ApplyFilter()
     {
-        if (string.IsNullOrWhiteSpace(SearchKeyword))
+        IEnumerable<HostRule> source = _allRules;
+
+        if (!string.IsNullOrWhiteSpace(SearchKeyword))
         {
-            FilteredRules = new ObservableCollection<HostRule>(_allRules);
-            return;
+            var keyword = SearchKeyword.Trim().ToLower();
+            source = _allRules.Where(r =>
+                (r.IP != null && r.IP.ToLower().Contains(keyword)) ||
+                (r.Domain != null && r.Domain.ToLower().Contains(keyword)) ||
+                (r.Comment != null && r.Comment.ToLower().Contains(keyword))
+            );
         }
 
-        var keyword = SearchKeyword.Trim().ToLower();
-        var filtered = _allRules.Where(r =>
-            (r.IP != null && r.IP.ToLower().Contains(keyword)) ||
-            (r.Domain != null && r.Domain.ToLower().Contains(keyword)) ||
-            (r.Comment != null && r.Comment.ToLower().Contains(keyword))
-        ).ToList();
-
-        FilteredRules = new ObservableCollection<HostRule>(filtered);
+        FilteredRules = new ObservableCollection<HostRule>(source.ToList());
     }
 
     private void RaiseSelectionCommands()
@@ -190,16 +193,41 @@ public class MainViewModel : ViewModelBase
         BatchDeleteCommand.RaiseCanExecuteChanged();
     }
 
-    private Task ExecuteAddRuleAsync()
+    private async Task ExecuteAddRuleAsync()
     {
         _logService.LogAction("Rule_Add", "准备添加Host规则");
-        return Task.CompletedTask;
+
+        var dialog = new RuleEditDialog();
+        dialog.Owner = Application.Current.MainWindow;
+        if (dialog.ShowDialog() == true && dialog.Result != null && CurrentEnvironment != null)
+        {
+            CurrentEnvironment.Rules.Add(dialog.Result);
+            _allRules.Add(dialog.Result);
+            ApplyFilter();
+            await _environmentService.SaveEnvironmentsAsync();
+            _logService.LogAction("Rule_Add", $"添加规则成功: {dialog.Result.IP} {dialog.Result.Domain}");
+        }
     }
 
-    private Task ExecuteEditRuleAsync(HostRule rule)
+    private async Task ExecuteEditRuleAsync(HostRule? rule)
     {
-        _logService.LogAction("Rule_Edit", $"准备编辑Host规则: {rule.Domain}", rule.Id.ToString());
-        return Task.CompletedTask;
+        if (rule == null) return;
+        _logService.LogAction("Rule_Edit", $"准备编辑Host规则: {rule.Domain}");
+
+        var dialog = new RuleEditDialog(rule);
+        dialog.Owner = Application.Current.MainWindow;
+        if (dialog.ShowDialog() == true && dialog.Result != null)
+        {
+            rule.IP = dialog.Result.IP;
+            rule.Domain = dialog.Result.Domain;
+            rule.Comment = dialog.Result.Comment;
+            rule.IsEnabled = dialog.Result.IsEnabled;
+            rule.Status = dialog.Result.IsEnabled ? RuleStatus.Active : RuleStatus.Inactive;
+            rule.UpdatedAt = DateTime.Now;
+            ApplyFilter();
+            await _environmentService.SaveEnvironmentsAsync();
+            _logService.LogAction("Rule_Edit", $"编辑规则完成: {rule.IP} {rule.Domain}");
+        }
     }
 
     private async Task ExecuteDeleteRuleAsync()
@@ -207,12 +235,18 @@ public class MainViewModel : ViewModelBase
         _logService.LogAction("Rule_Delete", $"准备删除{SelectedRules.Count}条Host规则");
         if (CurrentEnvironment == null) return;
 
+        var result = MessageBox.Show(
+            $"确定要删除选中的 {SelectedRules.Count} 条规则吗？",
+            "确认删除", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
         IsBusy = true;
         BusyMessage = "正在删除规则...";
 
         try
         {
-            foreach (var rule in SelectedRules)
+            foreach (var rule in SelectedRules.ToList())
             {
                 CurrentEnvironment.Rules.Remove(rule);
                 _allRules.Remove(rule);
@@ -220,7 +254,7 @@ public class MainViewModel : ViewModelBase
 
             ApplyFilter();
             await _environmentService.SaveEnvironmentsAsync();
-            _logService.LogAction("Rule_Delete", $"{SelectedRules.Count}条Host规则删除成功");
+            _logService.LogAction("Rule_Delete", "规则删除成功");
         }
         catch (Exception ex)
         {
@@ -233,17 +267,18 @@ public class MainViewModel : ViewModelBase
         }
     }
 
-    private async Task ExecuteToggleRuleAsync(HostRule rule)
+    private async Task ExecuteToggleRuleAsync(HostRule? rule)
     {
-        _logService.LogAction("Rule_Toggle", $"切换规则状态: {rule.Domain}, 当前: {rule.IsEnabled}");
+        if (rule == null) return;
+        _logService.LogAction("Rule_Toggle", $"切换规则状态: {rule.Domain}");
 
         try
         {
             rule.IsEnabled = !rule.IsEnabled;
             rule.Status = rule.IsEnabled ? RuleStatus.Active : RuleStatus.Inactive;
             rule.UpdatedAt = DateTime.Now;
-
             await _environmentService.SaveEnvironmentsAsync();
+            OnPropertyChanged(nameof(EnabledCount));
             _logService.LogAction("Rule_Toggle", $"规则状态切换完成: {rule.IsEnabled}");
         }
         catch (Exception ex)
@@ -284,21 +319,21 @@ public class MainViewModel : ViewModelBase
 
     private async Task ExecuteBatchEnableAsync()
     {
-        _logService.LogAction("Batch_Enable", $"批量启用{SelectedRules.Count}条规则");
+        _logService.LogAction("Batch_Enable", "批量启用所有规则");
         if (CurrentEnvironment == null) return;
-
         IsBusy = true;
         BusyMessage = "正在批量启用...";
 
         try
         {
-            foreach (var rule in SelectedRules)
+            foreach (var rule in _allRules)
             {
                 rule.IsEnabled = true;
                 rule.Status = RuleStatus.Active;
                 rule.UpdatedAt = DateTime.Now;
             }
 
+            ApplyFilter();
             await _environmentService.SaveEnvironmentsAsync();
             _logService.LogAction("Batch_Enable", "批量启用完成");
         }
@@ -315,21 +350,21 @@ public class MainViewModel : ViewModelBase
 
     private async Task ExecuteBatchDisableAsync()
     {
-        _logService.LogAction("Batch_Disable", $"批量禁用{SelectedRules.Count}条规则");
+        _logService.LogAction("Batch_Disable", "批量禁用所有规则");
         if (CurrentEnvironment == null) return;
-
         IsBusy = true;
         BusyMessage = "正在批量禁用...";
 
         try
         {
-            foreach (var rule in SelectedRules)
+            foreach (var rule in _allRules)
             {
                 rule.IsEnabled = false;
                 rule.Status = RuleStatus.Inactive;
                 rule.UpdatedAt = DateTime.Now;
             }
 
+            ApplyFilter();
             await _environmentService.SaveEnvironmentsAsync();
             _logService.LogAction("Batch_Disable", "批量禁用完成");
         }
@@ -346,20 +381,91 @@ public class MainViewModel : ViewModelBase
 
     private async Task ExecuteBatchDeleteAsync()
     {
-        _logService.LogAction("Batch_Delete", $"批量删除{SelectedRules.Count}条规则");
         await ExecuteDeleteRuleAsync();
     }
 
-    private Task ExecuteImportAsync()
+    private async Task ExecuteImportAsync()
     {
         _logService.LogAction("Data_Import", "准备导入Host规则");
-        return Task.CompletedTask;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "导入Host规则",
+            Filter = "Hosts文件 (*.hosts;*.txt)|*.hosts;*.txt|JSON文件 (*.json)|*.json|CSV文件 (*.csv)|*.csv|所有文件 (*.*)|*.*",
+            FilterIndex = 1
+        };
+
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            var ext = System.IO.Path.GetExtension(dialog.FileName).ToLower();
+            List<HostRule> rules = ext switch
+            {
+                ".json" => await _importExportService.ImportFromJsonAsync(dialog.FileName),
+                ".csv" => await _importExportService.ImportFromCsvAsync(dialog.FileName),
+                _ => await _importExportService.ImportFromHostsFileAsync(dialog.FileName)
+            };
+
+            if (rules.Count > 0 && CurrentEnvironment != null)
+            {
+                foreach (var rule in rules)
+                    CurrentEnvironment.Rules.Add(rule);
+
+                _allRules = new ObservableCollection<HostRule>(CurrentEnvironment.Rules);
+                ApplyFilter();
+                await _environmentService.SaveEnvironmentsAsync();
+
+                MessageBox.Show($"成功导入 {rules.Count} 条规则", "导入完成",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError("Data_Import", "导入失败", ex.ToString());
+            MessageBox.Show($"导入失败: {ex.Message}", "错误",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
-    private Task ExecuteExportAsync()
+    private async Task ExecuteExportAsync()
     {
         _logService.LogAction("Data_Export", $"准备导出{FilteredRules.Count}条Host规则");
-        return Task.CompletedTask;
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "导出Host规则",
+            Filter = "Hosts文件 (*.hosts)|*.hosts|JSON文件 (*.json)|*.json|CSV文件 (*.csv)|*.csv",
+            FilterIndex = 1
+        };
+
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            var ext = System.IO.Path.GetExtension(dialog.FileName).ToLower();
+            switch (ext)
+            {
+                case ".json":
+                    await _importExportService.ExportToJsonAsync(dialog.FileName, FilteredRules);
+                    break;
+                case ".csv":
+                    await _importExportService.ExportToCsvAsync(dialog.FileName, FilteredRules);
+                    break;
+                default:
+                    await _importExportService.ExportToHostsFileAsync(dialog.FileName, FilteredRules);
+                    break;
+            }
+
+            MessageBox.Show($"成功导出 {FilteredRules.Count} 条规则", "导出完成",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError("Data_Export", "导出失败", ex.ToString());
+            MessageBox.Show($"导出失败: {ex.Message}", "错误",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private async Task ExecuteCompareAsync()
@@ -370,18 +476,32 @@ public class MainViewModel : ViewModelBase
         try
         {
             var diffs = await _environmentService.CompareWithSystemHostsAsync(CurrentEnvironment.Id);
+
+            var compareDialog = new CompareDialog(diffs);
+            compareDialog.Owner = Application.Current.MainWindow;
+            compareDialog.ShowDialog();
+
             _logService.LogAction("Env_Compare", $"对比完成，差异数: {diffs.Count}");
         }
         catch (Exception ex)
         {
             _logService.LogError("Env_Compare", "对比失败", ex.ToString());
+            MessageBox.Show($"对比失败: {ex.Message}", "错误",
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private Task ExecuteCreateEnvironmentAsync()
+    private async Task ExecuteCreateEnvironmentAsync()
     {
         _logService.LogAction("Env_Create", "准备创建环境");
-        return Task.CompletedTask;
+
+        var dialog = new EnvironmentDialog();
+        dialog.Owner = Application.Current.MainWindow;
+        if (dialog.ShowDialog() == true)
+        {
+            await _environmentService.CreateEnvironmentAsync(dialog.EnvironmentName, dialog.EnvironmentDescription);
+            CurrentEnvironment = _environmentService.CurrentEnvironment;
+        }
     }
 
     private async Task ExecuteSwitchEnvironmentAsync(HostEnvironment env)
@@ -404,21 +524,32 @@ public class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logService.LogError("Env_Switch", "环境切换失败", ex.ToString());
+            MessageBox.Show($"环境切换失败: {ex.Message}", "错误",
+                MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void ExecuteOpenSettings()
     {
         _logService.LogAction("UI_Navigate", "打开设置界面");
+        var window = Application.Current.MainWindow;
+        if (window is MainWindow mw)
+            mw.NavigationListBox.SelectedIndex = 5;
     }
 
     private void ExecuteOpenLogs()
     {
         _logService.LogAction("UI_Navigate", "打开日志界面");
+        var window = Application.Current.MainWindow;
+        if (window is MainWindow mw)
+            mw.NavigationListBox.SelectedIndex = 4;
     }
 
     private void ExecuteOpenBackup()
     {
         _logService.LogAction("UI_Navigate", "打开备份界面");
+        var window = Application.Current.MainWindow;
+        if (window is MainWindow mw)
+            mw.NavigationListBox.SelectedIndex = 3;
     }
 }

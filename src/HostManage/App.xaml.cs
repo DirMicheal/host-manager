@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 using HostManage.Services;
 using HostManage.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +11,7 @@ public partial class App : Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -18,25 +19,72 @@ public partial class App : Application
         ConfigureServices(serviceCollection);
         Services = serviceCollection.BuildServiceProvider();
 
+        DispatcherUnhandledException += App_DispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+        TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
         try
         {
             var settingsService = Services.GetRequiredService<ISettingsService>();
-            await settingsService.LoadSettingsAsync();
+            settingsService.LoadSettingsAsync().Wait();
 
             var environmentService = Services.GetRequiredService<IEnvironmentService>();
-            await environmentService.LoadEnvironmentsAsync();
+            environmentService.LoadEnvironmentsAsync().Wait();
 
             var logService = Services.GetRequiredService<ILogService>();
             logService.LogAction("App_Startup", "应用程序启动");
 
             var themeService = Services.GetRequiredService<IThemeService>();
             themeService.ApplyTheme(settingsService.Current.Theme);
+
+            var mainWindow = Services.GetRequiredService<MainWindow>();
+            mainWindow.Show();
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"应用程序初始化失败: {ex.Message}", "错误",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"应用程序初始化失败:\n{ex.Message}\n\n{ex.InnerException?.Message}",
+                "启动错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
         }
+    }
+
+    private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        try
+        {
+            var logService = Services?.GetService<ILogService>();
+            logService?.LogError("UnhandledException", e.Exception.Message, e.Exception.ToString());
+        }
+        catch { }
+
+        MessageBox.Show($"发生未处理的异常:\n{e.Exception.Message}",
+            "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        e.Handled = true;
+    }
+
+    private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex)
+        {
+            try
+            {
+                var logService = Services?.GetService<ILogService>();
+                logService?.LogError("DomainUnhandledException", ex.Message, ex.ToString());
+            }
+            catch { }
+        }
+    }
+
+    private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        try
+        {
+            var logService = Services?.GetService<ILogService>();
+            logService?.LogError("UnobservedTaskException", e.Exception?.InnerException?.Message ?? "Unknown",
+                e.Exception?.ToString() ?? "");
+        }
+        catch { }
+        e.SetObserved();
     }
 
     protected override void OnExit(ExitEventArgs e)

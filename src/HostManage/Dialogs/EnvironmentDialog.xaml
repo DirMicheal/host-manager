@@ -33,7 +33,7 @@
                 <StackPanel Grid.Column="1">
                     <TextBox x:Name="NameTextBox"
                              materialDesign:HintAssist.Hint="例如: 开发环境、测试环境"
-                             Text="{Binding EnvName, UpdateSourceTrigger=PropertyChanged}"/>
+                             Text="{Binding EnvironmentName, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
             </Grid>
 
@@ -44,7 +44,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="描述:" VerticalAlignment="Top" FontSize="14"/>
                 <TextBox Grid.Column="1" materialDesign:HintAssist.Hint="可选，环境的详细说明"
-                         Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding EnvironmentDescription, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap" Height="100"
                          VerticalScrollBarVisibility="Auto"/>
             </Grid>

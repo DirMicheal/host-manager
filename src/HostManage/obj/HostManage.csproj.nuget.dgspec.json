@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj": {}
+    "D:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj": {}
   },
   "projects": {
-    "d:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj": {
+    "D:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj",
+        "projectUniqueName": "D:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj",
         "projectName": "HostManage",
-        "projectPath": "d:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj",
+        "projectPath": "D:\\solo\\hostManage\\src\\HostManage\\HostManage.csproj",
         "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-        "outputPath": "d:\\solo\\hostManage\\src\\HostManage\\obj\\",
+        "outputPath": "D:\\solo\\hostManage\\src\\HostManage\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Administrator\\AppData\\Roaming\\NuGet\\NuGet.Config"

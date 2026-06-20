@@ -3,10 +3,13 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using HostManage.Dialogs;
 using HostManage.Models;
 using HostManage.Services;
 using HostManage.ViewModels;
+using HostManage.Views;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32;
 
 namespace HostManage;
 
@@ -17,6 +20,13 @@ public partial class MainWindow : Window
     private readonly ILogService _logService;
     private readonly ISettingsService _settingsService;
     private readonly DispatcherTimer _clockTimer;
+
+    private HostRulesPage? _rulesPage;
+    private EnvironmentPage? _environmentPage;
+    private ProxyPage? _proxyPage;
+    private BackupPage? _backupPage;
+    LogsPage? _logsPage;
+    private SettingsPage? _settingsPage;
 
     public MainWindow()
     {
@@ -29,10 +39,7 @@ public partial class MainWindow : Window
 
         DataContext = _viewModel;
 
-        _clockTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(1)
-        };
+        _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _clockTimer.Tick += ClockTimer_Tick;
         _clockTimer.Start();
 
@@ -51,6 +58,8 @@ public partial class MainWindow : Window
             UpdateCurrentTime();
 
             await _viewModel.LoadAsync();
+
+            NavigateToRules();
         }
         catch (Exception ex)
         {
@@ -60,15 +69,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ClockTimer_Tick(object? sender, EventArgs e)
-    {
-        UpdateCurrentTime();
-    }
+    private void ClockTimer_Tick(object? sender, EventArgs e) => UpdateCurrentTime();
 
-    private void UpdateCurrentTime()
-    {
+    private void UpdateCurrentTime() =>
         CurrentTimeTextBlock.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-    }
 
     private void UpdateAdminStatus(bool isAdmin)
     {
@@ -95,105 +99,75 @@ public partial class MainWindow : Window
         switch (tag)
         {
             case "Rules":
+                NavigateToRules();
                 break;
             case "Environments":
-                ShowEnvironmentPanel();
+                NavigateToEnvironments();
                 break;
             case "Proxy":
-                ShowProxyPanel();
+                NavigateToProxy();
                 break;
             case "Backup":
-                ShowBackupPanel();
+                NavigateToBackup();
                 break;
             case "Logs":
-                ShowLogsPanel();
+                NavigateToLogs();
                 break;
             case "Settings":
-                ShowSettingsPanel();
+                NavigateToSettings();
                 break;
         }
     }
 
-    private void ShowEnvironmentPanel()
+    private void NavigateToRules()
+    {
+        _rulesPage ??= new HostRulesPage { DataContext = _viewModel };
+        MainContentControl.Content = _rulesPage;
+    }
+
+    private void NavigateToEnvironments()
     {
         var vm = App.Services.GetRequiredService<EnvironmentListViewModel>();
         _ = vm.LoadAsync();
+        _environmentPage ??= new EnvironmentPage();
+        _environmentPage.DataContext = vm;
+        MainContentControl.Content = _environmentPage;
     }
 
-    private void ShowProxyPanel()
+    private void NavigateToProxy()
     {
         var vm = App.Services.GetRequiredService<ProxyListViewModel>();
         _ = vm.LoadAsync();
+        _proxyPage ??= new ProxyPage();
+        _proxyPage.DataContext = vm;
+        MainContentControl.Content = _proxyPage;
     }
 
-    private void ShowBackupPanel()
+    private void NavigateToBackup()
     {
         var vm = App.Services.GetRequiredService<BackupListViewModel>();
         _ = vm.LoadAsync();
+        _backupPage ??= new BackupPage();
+        _backupPage.DataContext = vm;
+        MainContentControl.Content = _backupPage;
     }
 
-    private void ShowLogsPanel()
+    private void NavigateToLogs()
     {
         var vm = App.Services.GetRequiredService<LogsViewModel>();
         _ = vm.LoadAsync();
+        _logsPage ??= new LogsPage();
+        _logsPage.DataContext = vm;
+        MainContentControl.Content = _logsPage;
     }
 
-    private void ShowSettingsPanel()
+    private void NavigateToSettings()
     {
         var vm = App.Services.GetRequiredService<SettingsViewModel>();
         _ = vm.LoadAsync();
-    }
-
-    private void RulesDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (RulesDataGrid.SelectedItems is IList selectedItems)
-        {
-            var selected = new List<HostRule>();
-            foreach (var item in selectedItems)
-            {
-                if (item is HostRule rule)
-                {
-                    selected.Add(rule);
-                }
-            }
-            _viewModel.SelectedRules = selected;
-        }
-    }
-
-    private void RulesDataGrid_LoadingRow(object sender, DataGridRowEventArgs e)
-    {
-        if (e.Row.Item is HostRule rule)
-        {
-            e.Row.Style = rule.Status switch
-            {
-                RuleStatus.Active => (Style)FindResource("RuleRowActive"),
-                RuleStatus.Inactive => (Style)FindResource("RuleRowInactive"),
-                RuleStatus.Conflict => (Style)FindResource("RuleRowConflict"),
-                RuleStatus.Invalid => (Style)FindResource("RuleRowInvalid"),
-                _ => (Style)FindResource("RuleRowActive")
-            };
-        }
-    }
-
-    private async void DeleteRuleButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button button && button.Tag is HostRule rule)
-        {
-            var result = MessageBox.Show(
-                $"确定要删除规则 \"{rule.Domain}\" 吗？",
-                "确认删除",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                _viewModel.SelectedRules = new List<HostRule> { rule };
-                if (_viewModel.DeleteRuleCommand.CanExecute(null))
-                {
-                    await _viewModel.DeleteRuleCommand.ExecuteAsync(null);
-                }
-            }
-        }
+        _settingsPage ??= new SettingsPage();
+        _settingsPage.DataContext = vm;
+        MainContentControl.Content = _settingsPage;
     }
 
     private async void Window_Drop(object sender, DragEventArgs e)
@@ -207,8 +181,7 @@ public partial class MainWindow : Window
             if (files == null || files.Length == 0)
                 return;
 
-            _logService.LogAction("File_Drop", $"检测到拖放文件: {files.Length} 个",
-                string.Join(";", files));
+            _logService.LogAction("File_Drop", $"检测到拖放文件: {files.Length} 个", string.Join(";", files));
 
             var importExportService = App.Services.GetRequiredService<IImportExportService>();
             var importedRules = new List<HostRule>();
@@ -224,7 +197,6 @@ public partial class MainWindow : Window
                         ".csv" => await importExportService.ImportFromCsvAsync(file),
                         _ => await importExportService.ImportFromHostsFileAsync(file)
                     };
-
                     importedRules.AddRange(rules);
                 }
                 catch (Exception ex)
@@ -241,20 +213,14 @@ public partial class MainWindow : Window
                 if (env != null)
                 {
                     foreach (var rule in importedRules)
-                    {
                         env.Rules.Add(rule);
-                    }
 
                     var environmentService = App.Services.GetRequiredService<IEnvironmentService>();
                     await environmentService.SaveEnvironmentsAsync();
                     await _viewModel.LoadAsync();
 
-                    _logService.LogAction("File_Import", $"成功导入 {importedRules.Count} 条规则");
-                    MessageBox.Show(
-                        $"成功导入 {importedRules.Count} 条规则到环境 \"{env.Name}\"",
-                        "导入完成",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    MessageBox.Show($"成功导入 {importedRules.Count} 条规则到环境 \"{env.Name}\"",
+                        "导入完成", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
         }
@@ -270,13 +236,10 @@ public partial class MainWindow : Window
     {
         try
         {
-            _logService.LogAction("App_Closing", "窗口正在关闭，正在保存配置...");
-
+            _logService.LogAction("App_Closing", "窗口正在关闭");
             await _settingsService.SaveSettingsAsync();
-
             var environmentService = App.Services.GetRequiredService<IEnvironmentService>();
             await environmentService.SaveEnvironmentsAsync();
-
             _clockTimer.Stop();
         }
         catch (Exception ex)

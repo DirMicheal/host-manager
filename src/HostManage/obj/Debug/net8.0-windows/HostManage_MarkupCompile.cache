@@ -4,12 +4,12 @@
 winexe
 C#
 .cs
-d:\solo\hostManage\src\HostManage\obj\Debug\net8.0-windows\
+D:\solo\hostManage\src\HostManage\obj\Debug\net8.0-windows\
 HostManage
 none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP
-d:\solo\hostManage\src\HostManage\App.xaml
+D:\solo\hostManage\src\HostManage\App.xaml
 171988431265
 
 761371651923

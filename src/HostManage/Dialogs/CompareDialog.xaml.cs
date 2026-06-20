@@ -21,9 +21,9 @@ public partial class CompareDialog : Window
         DataContext = this;
     }
 
-    public CompareDialog(string environmentName, IEnumerable<DiffItem> diffItems) : this()
+    public CompareDialog(IEnumerable<DiffItem> diffItems) : this()
     {
-        Subtitle = $"环境: {environmentName} 与系统当前Hosts文件对比";
+        Subtitle = "与系统当前Hosts文件对比";
         DiffItems = diffItems.ToList();
 
         AddedCount = DiffItems.Count(d => d.Type == DiffType.Added);
